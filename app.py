@@ -3,6 +3,7 @@ import datetime
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+from dash.dependencies import Input, Output
 import pandas as pd
 import plotly.express as px
 import requests
@@ -37,7 +38,7 @@ LOCATION_MAPPER = {
     'Kanta-Häme': (60.9947862, 24.3781338),
     'Varsinais-Suomi': (60.431959, 22.0841279),
     'Satakunta': (61.4799843, 21.7589953),
-    'Vaasa': (63.0689039, 22.0)
+    'Vaasa': (63.085024, 21.6148133)
 }
 
 
@@ -123,32 +124,48 @@ total = total[total['pvm'] > '2020-03']
 app = dash.Dash(__name__)
 app.title = "Korona-animaatio"
 
-fig = px.scatter_mapbox(
+fig_1 = px.scatter_mapbox(
     total,
-    lat="lat",
-    lon="lon",
-    color="shp",
-    hover_name="shp",
-    hover_data="confirmed deaths recovered".split(),
-    size="active",
-    animation_frame="pvm",
+    lat='lat',
+    lon='lon',
+    color='shp',
+    hover_name='shp',
+    hover_data='confirmed deaths recovered'.split(),
+    size='active',
+    animation_frame='pvm',
     center={'lat': 63.4, 'lon': 26.0},
     zoom=4,
-    size_max=25,
+    size_max=30,
     height=600,
     width=None,
+    opacity=1,
 )
-fig.update_layout(mapbox_style="carto-darkmatter")
+fig_1.update_layout(mapbox_style="carto-darkmatter")
+
+fig_2 = px.bar(
+    total,
+    x='pvm',
+    y='active',
+    color='shp',
+    hover_name="shp",
+    height=520,
+    width=None,
+)
 
 application = app.server
 
 app.layout = html.Div(children=[
     html.H2(children='Suomen koronavirustartunnat', style={'text-align': 'center'}),
-    html.H4(children='Tapaukset sairaanhoitopiireittäin 2020-03-01 alkaen', style={'text-align': 'center'}),
+    html.H4(children='Aktiiviset tapaukset sairaanhoitopiireittäin 2020-03-01 alkaen', style={'text-align': 'center'}),
 
     dcc.Graph(
         id='map',
-        figure=fig,
+        figure=fig_1,
+    ),
+
+    dcc.Graph(
+        id='bar-plot',
+        figure=fig_2,
     ),
 
     html.P(children='Antti Härkönen 2020'),
