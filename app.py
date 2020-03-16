@@ -194,15 +194,16 @@ fig.update_layout(mapbox_style="carto-darkmatter")
 application = app.server
 
 app.layout = html.Div(children=[
-    html.H2(children='Suomen koronavirustartunnat'),
-    html.H4(children='Tapaukset sairaanhoitopiireittäin 2020-03-01 alkaen'),
+    html.H2(children='Suomen koronavirustartunnat', style={'text-align': 'center'}),
+    html.H4(children='Tapaukset sairaanhoitopiireittäin 2020-03-01 alkaen', style={'text-align': 'center'}),
 
     dcc.Graph(
         id='map',
         figure=fig,
     ),
 
-    html.P(children='Antti Härkönen 2020')
+    html.P(children='Antti Härkönen 2020'),
+    html.P(children='Aineisto on peräisin Helsingin Sanomien avoimesta rajapinnasta.'),
 ])
 
 
