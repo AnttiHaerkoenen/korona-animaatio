@@ -137,7 +137,7 @@ fig_1 = px.scatter_mapbox(
     size_max=30,
     height=600,
     width=None,
-    opacity=1,
+    opacity=0.75,
 )
 fig_1.update_layout(mapbox_style="carto-darkmatter")
 
