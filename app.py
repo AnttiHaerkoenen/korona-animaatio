@@ -100,78 +100,81 @@ def make_dataframe(json_list):
     return sums
 
 
-req = requests.get(
+def serve_layout():
+    req = requests.get(
         data_url,
         headers=headers,
         timeout=60,
-)
+    )
 
-result = req.json()
+    result = req.json()
 
-confirmed = make_dataframe(result['confirmed']).rename(columns={'n': 'confirmed'})
-deaths = make_dataframe(result['deaths']).rename(columns={'n': 'deaths'})
-recovered = make_dataframe(result['recovered']).rename(columns={'n': 'recovered'})
+    confirmed = make_dataframe(result['confirmed']).rename(columns={'n': 'confirmed'})
+    deaths = make_dataframe(result['deaths']).rename(columns={'n': 'deaths'})
+    recovered = make_dataframe(result['recovered']).rename(columns={'n': 'recovered'})
 
-total = pd.concat([confirmed, deaths, recovered], axis=1).drop(columns=['pvm', 'shp']).fillna(0)
-total['active'] = total['confirmed'] - total['deaths'] - total['recovered']
+    total = pd.concat([confirmed, deaths, recovered], axis=1).drop(columns=['pvm', 'shp']).fillna(0)
+    total['active'] = total['confirmed'] - total['deaths'] - total['recovered']
 
-total.reset_index(inplace=True)
-total['pvm'] = total['pvm'].apply(lambda d: str(d).split()[0])
-total['lat'] = total.shp.apply(lambda p: LOCATION_MAPPER.get(p, (None, None))[0])
-total['lon'] = total.shp.apply(lambda p: LOCATION_MAPPER.get(p, (None, None))[1])
-total = total[total['pvm'] > '2020-03']
+    total.reset_index(inplace=True)
+    total['pvm'] = total['pvm'].apply(lambda d: str(d).split()[0])
+    total['lat'] = total.shp.apply(lambda p: LOCATION_MAPPER.get(p, (None, None))[0])
+    total['lon'] = total.shp.apply(lambda p: LOCATION_MAPPER.get(p, (None, None))[1])
+    total = total[total['pvm'] > '2020-03']
+
+    fig_1 = px.scatter_mapbox(
+        total,
+        lat='lat',
+        lon='lon',
+        color='shp',
+        hover_name='shp',
+        hover_data='confirmed deaths recovered'.split(),
+        size='active',
+        animation_frame='pvm',
+        center={'lat': 63.4, 'lon': 26.0},
+        zoom=4,
+        size_max=30,
+        height=600,
+        width=None,
+        opacity=OPACITY,
+    )
+    fig_1.update_layout(mapbox_style="carto-darkmatter")
+
+    fig_2 = px.bar(
+        total,
+        x='pvm',
+        y='active',
+        color='shp',
+        hover_name="shp",
+        height=520,
+        width=None,
+        opacity=OPACITY,
+    )
+
+    return html.Div(children=[
+        html.H2(children='Suomen koronavirustartunnat', style={'text-align': 'center'}),
+        html.H4(children='Aktiiviset tapaukset sairaanhoitopiireittäin 2020-03-01 alkaen', style={'text-align': 'center'}),
+
+        dcc.Graph(
+            id='map',
+            figure=fig_1,
+        ),
+
+        dcc.Graph(
+            id='bar-plot',
+            figure=fig_2,
+        ),
+
+        html.P(children='Antti Härkönen 2020'),
+        html.P(children='Aineisto on peräisin Helsingin Sanomien avoimesta rajapinnasta.'),
+    ])
+
 
 app = dash.Dash(__name__)
 app.title = "Korona-animaatio"
-
-fig_1 = px.scatter_mapbox(
-    total,
-    lat='lat',
-    lon='lon',
-    color='shp',
-    hover_name='shp',
-    hover_data='confirmed deaths recovered'.split(),
-    size='active',
-    animation_frame='pvm',
-    center={'lat': 63.4, 'lon': 26.0},
-    zoom=4,
-    size_max=30,
-    height=600,
-    width=None,
-    opacity=OPACITY,
-)
-fig_1.update_layout(mapbox_style="carto-darkmatter")
-
-fig_2 = px.bar(
-    total,
-    x='pvm',
-    y='active',
-    color='shp',
-    hover_name="shp",
-    height=520,
-    width=None,
-    opacity=OPACITY,
-)
+app.layout = serve_layout()
 
 application = app.server
-
-app.layout = html.Div(children=[
-    html.H2(children='Suomen koronavirustartunnat', style={'text-align': 'center'}),
-    html.H4(children='Aktiiviset tapaukset sairaanhoitopiireittäin 2020-03-01 alkaen', style={'text-align': 'center'}),
-
-    dcc.Graph(
-        id='map',
-        figure=fig_1,
-    ),
-
-    dcc.Graph(
-        id='bar-plot',
-        figure=fig_2,
-    ),
-
-    html.P(children='Antti Härkönen 2020'),
-    html.P(children='Aineisto on peräisin Helsingin Sanomien avoimesta rajapinnasta.'),
-])
 
 
 if __name__ == '__main__':
