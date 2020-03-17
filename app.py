@@ -17,6 +17,7 @@ headers = {
 data_url = 'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData'
 
 FIRST = '2020-01-28'
+OPACITY = 0.8
 LOCATION_MAPPER = {
     'Itä-Savo': (61.868351, 28.886259),
     'HUS': (60.169857, 24.938379),
@@ -137,7 +138,7 @@ fig_1 = px.scatter_mapbox(
     size_max=30,
     height=600,
     width=None,
-    opacity=0.75,
+    opacity=OPACITY,
 )
 fig_1.update_layout(mapbox_style="carto-darkmatter")
 
@@ -149,6 +150,7 @@ fig_2 = px.bar(
     hover_name="shp",
     height=520,
     width=None,
+    opacity=OPACITY,
 )
 
 application = app.server
