@@ -1,4 +1,5 @@
 import datetime
+from dateutil import tz
 
 import dash
 import dash_core_components as dcc
@@ -214,13 +215,13 @@ def get_data(
     [Input('switch', 'value')],
     )
 def update_figures(option):
-    today = datetime.datetime.now()
+    today = datetime.datetime.now(tz=tz.gettz('Helsinki'))
     date_ = today.date().isoformat()
     hour_ = today.time().hour
     minute_ = today.time().minute
 
     update_time = f"Aineisto on peräisin Helsingin Sanomien avoimesta rajapinnasta." \
-                  f" Päivitetty {date_} klo {hour_}.{minute_}."
+                  f" Päivitetty {date_} klo {hour_}.{minute_:02}."
 
     if option == 'total':
         size_col = 'active'
