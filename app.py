@@ -3,21 +3,28 @@ import datetime
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+from dash.dependencies import Input, Output
 import pandas as pd
 import plotly.express as px
 import requests
 
 
-headers = {
+class APIError(Exception):
+    pass
+
+
+HEADERS = {
     'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) '
                   'AppleWebKit/537.36 (KHTML, like Gecko) '
                   'Chrome/53.0.2785.143 Safari/537.36',
 }
 
-data_url = 'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData'
+DATA_URL = 'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData'
 
 FIRST = '2020-01-28'
+
 OPACITY = 0.8
+
 LOCATION_MAPPER = {
     'Itä-Savo': (61.868351, 28.886259),
     'HUS': (60.169857, 24.938379),
@@ -42,7 +49,43 @@ LOCATION_MAPPER = {
 }
 
 
-def make_dataframe(json_list):
+def serve_layout():
+    return html.Div(children=[
+        html.H2(children='Suomen koronavirustartunnat', style={'text-align': 'center'}),
+        html.H4(children='Aktiiviset tapaukset sairaanhoitopiireittäin 2020-03-01 alkaen', style={'text-align': 'center'}),
+
+        dcc.RadioItems(
+            id='switch',
+            options=[
+                {'label': 'Kaikki aktiiviset', 'value': 'total'},
+                {'label': 'Uudet tartunnat', 'value': 'confirmed'},
+            ],
+            value='total',
+        ),
+
+        dcc.Graph(id='map'),
+
+        dcc.Graph(id='bar-plot'),
+
+        html.P(children='Antti Härkönen 2020'),
+        html.P(id='source'),
+    ])
+
+
+app = dash.Dash(__name__)
+app.title = "Korona-animaatio"
+
+app.layout = serve_layout()
+
+application = app.server
+
+
+def make_data_frame(
+        json_list,
+        start_date: str,
+        end_date: str,
+        cumulative: bool,
+):
     cases = [
         (
             case['date'].split('T')[0],
@@ -68,30 +111,44 @@ def make_dataframe(json_list):
     ]
 
     districts = []
-    today = str(datetime.date.today())
 
     for p in parts:
         d = p
-        d.loc[:, 'n'] = p.n.cumsum()
 
-        if today in d.pvm.values:
-            first_last = pd.DataFrame.from_dict({
+        if cumulative:
+            d.loc[:, 'n'] = p.n.cumsum()
+
+        if end_date not in d.pvm.values:
+            if cumulative:
+                d = d.append(pd.DataFrame.from_dict({
+                    'pvm': [end_date],
+                    'shp': [d.shp.values[0]],
+                    'n': [d.iat[-1, 2]]
+                }))
+            else:
+                d = d.append(pd.DataFrame.from_dict({
+                    'pvm': [end_date],
+                    'shp': [d.shp.values[0]],
+                    'n': [0]
+                }))
+
+        if start_date not in d.pvm.values:
+            d = d.append(pd.DataFrame.from_dict({
                 'pvm': [FIRST],
                 'shp': [d.shp.values[0]],
                 'n': [0]
-            })
-        else:
-            first_last = pd.DataFrame.from_dict({
-                'pvm': [FIRST, today],
-                'shp': [d.shp.values[0]] * 2,
-                'n': [0, d.iat[-1, 2]]
-            })
-
-        d = d.append(first_last)
+            }))
 
         d.loc[:, 'pvm'] = pd.to_datetime(d['pvm'])
         d = d.set_index('pvm')
-        d = d.resample('1D').ffill()
+
+        if cumulative:
+            d = d.resample('1D').ffill()
+        else:
+            d = d.resample('1D').asfreq()
+            d['shp'] = d['shp'].ffill()
+
+        d = d[start_date:end_date]
         districts.append(d)
 
     sums = pd.concat(districts)
@@ -100,36 +157,97 @@ def make_dataframe(json_list):
     return sums
 
 
-def serve_layout():
+def get_data(
+        start_date: str,
+        end_date: str,
+        cumulative: bool,
+):
     req = requests.get(
-        data_url,
-        headers=headers,
+        DATA_URL,
+        headers=HEADERS,
         timeout=60,
     )
 
+    req.raise_for_status()
     result = req.json()
 
-    confirmed = make_dataframe(result['confirmed']).rename(columns={'n': 'confirmed'})
-    deaths = make_dataframe(result['deaths']).rename(columns={'n': 'deaths'})
-    recovered = make_dataframe(result['recovered']).rename(columns={'n': 'recovered'})
+    if 'message' in result:
+        raise APIError(result['message'])
+
+    confirmed = make_data_frame(
+        result['confirmed'],
+        start_date=start_date,
+        end_date=end_date,
+        cumulative=cumulative,
+    ).rename(columns={'n': 'confirmed'})
+
+    deaths = make_data_frame(
+        result['deaths'],
+        start_date=start_date,
+        end_date=end_date,
+        cumulative=cumulative,
+    ).rename(columns={'n': 'deaths'})
+
+    recovered = make_data_frame(
+        result['recovered'],
+        start_date=start_date,
+        end_date=end_date,
+        cumulative=cumulative,
+    ).rename(columns={'n': 'recovered'})
 
     total = pd.concat([confirmed, deaths, recovered], axis=1).drop(columns=['pvm', 'shp']).fillna(0)
     total['active'] = total['confirmed'] - total['deaths'] - total['recovered']
 
     total.reset_index(inplace=True)
+
     total['pvm'] = total['pvm'].apply(lambda d: str(d).split()[0])
     total['lat'] = total.shp.apply(lambda p: LOCATION_MAPPER.get(p, (None, None))[0])
     total['lon'] = total.shp.apply(lambda p: LOCATION_MAPPER.get(p, (None, None))[1])
-    total = total[total['pvm'] > '2020-03']
 
-    fig_1 = px.scatter_mapbox(
-        total,
+    return total
+
+
+@app.callback(
+    [Output('map', 'figure'),
+     Output('bar-plot', 'figure'),
+     Output('source', 'children')],
+    [Input('switch', 'value')],
+    )
+def update_figures(option):
+    today = datetime.datetime.now()
+    date_ = today.date().isoformat()
+    hour_ = today.time().hour
+    minute_ = today.time().minute
+
+    update_time = f"Aineisto on peräisin Helsingin Sanomien avoimesta rajapinnasta." \
+                  f" Päivitetty {date_} klo {hour_}.{minute_}."
+
+    if option == 'total':
+        size_col = 'active'
+
+        data = get_data(
+            '2020-03-01',
+            date_,
+            cumulative=True,
+        )
+
+    else:
+        size_col = 'confirmed'
+
+        data = get_data(
+            '2020-03-01',
+            date_,
+            cumulative=False,
+        )
+
+    fig1 = px.scatter_mapbox(
+        data,
         lat='lat',
         lon='lon',
         color='shp',
         hover_name='shp',
         hover_data='confirmed deaths recovered'.split(),
-        size='active',
+        size=size_col,
         animation_frame='pvm',
         center={'lat': 63.4, 'lon': 26.0},
         zoom=4,
@@ -138,12 +256,12 @@ def serve_layout():
         width=None,
         opacity=OPACITY,
     )
-    fig_1.update_layout(mapbox_style="carto-darkmatter")
+    fig1.update_layout(mapbox_style="carto-darkmatter")
 
-    fig_2 = px.bar(
-        total,
+    fig2 = px.bar(
+        data,
         x='pvm',
-        y='active',
+        y=size_col,
         color='shp',
         hover_name="shp",
         height=520,
@@ -151,35 +269,12 @@ def serve_layout():
         opacity=OPACITY,
     )
 
-    return html.Div(children=[
-        html.H2(children='Suomen koronavirustartunnat', style={'text-align': 'center'}),
-        html.H4(children='Aktiiviset tapaukset sairaanhoitopiireittäin 2020-03-01 alkaen', style={'text-align': 'center'}),
-
-        dcc.Graph(
-            id='map',
-            figure=fig_1,
-        ),
-
-        dcc.Graph(
-            id='bar-plot',
-            figure=fig_2,
-        ),
-
-        html.P(children='Antti Härkönen 2020'),
-        html.P(children='Aineisto on peräisin Helsingin Sanomien avoimesta rajapinnasta.'),
-    ])
-
-
-app = dash.Dash(__name__)
-app.title = "Korona-animaatio"
-app.layout = serve_layout()
-
-application = app.server
+    return fig1, fig2, update_time
 
 
 if __name__ == '__main__':
     app.run_server(
         port=8080,
-        host='0.0.0.0',
+        # host='0.0.0.0',
         debug=True,
     )
