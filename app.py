@@ -215,7 +215,7 @@ def get_data(
     [Input('switch', 'value')],
     )
 def update_figures(option):
-    today = datetime.datetime.now(tz=tz.gettz('Helsinki'))
+    today = datetime.datetime.now(tz=tz.gettz('Europe/Helsinki'))
     date_ = today.date().isoformat()
     hour_ = today.time().hour
     minute_ = today.time().minute
