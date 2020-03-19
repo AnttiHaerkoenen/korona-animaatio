@@ -23,6 +23,7 @@ HEADERS = {
 DATA_URL = 'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData'
 
 FIRST = '2020-01-28'
+START_DATE = '2020-03-01'
 
 OPACITY = 0.8
 
@@ -52,24 +53,41 @@ LOCATION_MAPPER = {
 
 def serve_layout():
     return html.Div(children=[
-        html.H2(children='Suomen koronavirustartunnat', style={'text-align': 'center'}),
-        html.H4(children='Aktiiviset tapaukset sairaanhoitopiireittäin 2020-03-01 alkaen', style={'text-align': 'center'}),
+        html.Div(children=[
+            html.H2(children='Suomen koronavirustartunnat',
+                    style={'text-align': 'center'}),
+            html.H4(children=f'Aktiiviset tapaukset sairaanhoitopiireittäin {START_DATE} alkaen',
+                    style={'text-align': 'center'}),
+            html.H4(children=f'Active cases in Finland by healthcare district since {START_DATE}',
+                    style={
+                        'text-align': 'center',
+                        'font-style': 'italic',
+                    }),
+        ]),
 
-        dcc.RadioItems(
-            id='switch',
-            options=[
-                {'label': 'Kaikki aktiiviset', 'value': 'total'},
-                {'label': 'Uudet tartunnat', 'value': 'confirmed'},
-            ],
-            value='total',
-        ),
+        html.Div(children=[
+            dcc.Dropdown(
+                id='switch',
+                options=[
+                    {'label': 'Kaikki aktiiviset | All active cases', 'value': 'total'},
+                    {'label': 'Uudet tartunnat | Confirmed new cases', 'value': 'confirmed'},
+                ],
+                value='total',
+            ),
+        ]),
 
         dcc.Graph(id='map'),
 
         dcc.Graph(id='bar-plot'),
 
-        html.P(children='Antti Härkönen 2020'),
-        html.P(id='source'),
+        html.Div(children=[
+            html.P(children='Antti Härkönen 2020'),
+            html.P(id='source-fi'),
+            html.P(
+                id='source-en',
+                style={'font-style': 'italic'}
+            ),
+        ]),
     ])
 
 
@@ -211,7 +229,9 @@ def get_data(
 @app.callback(
     [Output('map', 'figure'),
      Output('bar-plot', 'figure'),
-     Output('source', 'children')],
+     Output('source-fi', 'children'),
+     Output('source-en', 'children'),
+     ],
     [Input('switch', 'value')],
     )
 def update_figures(option):
@@ -220,14 +240,16 @@ def update_figures(option):
     hour_ = today.time().hour
     minute_ = today.time().minute
 
-    update_time = f"Aineisto on peräisin Helsingin Sanomien avoimesta rajapinnasta." \
+    update_time_fi = f"Aineisto on peräisin Helsingin Sanomien avoimesta rajapinnasta." \
                   f" Päivitetty {date_} klo {hour_}.{minute_:02}."
+    update_time_en = f"Data from API by Helsingin Sanomat." \
+                  f" Updated {date_} {hour_:02}:{minute_:02}."
 
     if option == 'total':
         size_col = 'active'
 
         data = get_data(
-            '2020-03-01',
+            START_DATE,
             date_,
             cumulative=True,
         )
@@ -236,7 +258,7 @@ def update_figures(option):
         size_col = 'confirmed'
 
         data = get_data(
-            '2020-03-01',
+            START_DATE,
             date_,
             cumulative=False,
         )
@@ -270,7 +292,7 @@ def update_figures(option):
         opacity=OPACITY,
     )
 
-    return fig1, fig2, update_time
+    return fig1, fig2, update_time_fi, update_time_en
 
 
 if __name__ == '__main__':
