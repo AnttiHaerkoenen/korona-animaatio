@@ -27,6 +27,7 @@ START_DATE = '2020-03-01'
 
 OPACITY = 0.8
 
+UNKNOWN = 'tuntematon'
 LOCATION_MAPPER = {
     'Itä-Savo': (61.868351, 28.886259),
     'HUS': (60.169857, 24.938379),
@@ -114,7 +115,10 @@ def make_data_frame(
         for case
         in json_list
     ]
-    data = pd.DataFrame.from_records(cases, columns=['pvm', 'shp', 'n'])
+    data = pd.DataFrame.from_records(
+        cases,
+        columns=['pvm', 'shp', 'n'],
+    ).fillna(value=UNKNOWN).replace('', UNKNOWN)
 
     if data.empty:
         return data
@@ -214,14 +218,15 @@ def get_data(
         cumulative=cumulative,
     ).rename(columns={'n': 'recovered'})
 
-    total = pd.concat([confirmed, deaths, recovered], axis=1).drop(columns=['pvm', 'shp']).fillna(0)
-    total['active'] = total['confirmed'] - total['deaths'] - total['recovered']
+    total = pd.concat([confirmed, deaths, recovered], axis=1)
+    total = total.fillna(0)
+    total['active'] = total['confirmed'] - total['recovered'] - total['deaths']
 
     total.reset_index(inplace=True)
 
     total['pvm'] = total['pvm'].apply(lambda d: str(d).split()[0])
-    total['lat'] = total.shp.apply(lambda p: LOCATION_MAPPER.get(p, (None, None))[0])
-    total['lon'] = total.shp.apply(lambda p: LOCATION_MAPPER.get(p, (None, None))[1])
+    total['lat'] = total.shp.apply(lambda p: LOCATION_MAPPER.get(p, (65, 23))[0])
+    total['lon'] = total.shp.apply(lambda p: LOCATION_MAPPER.get(p, (65, 23))[1])
 
     return total
 
