@@ -73,6 +73,7 @@ def serve_layout():
                 options=[
                     {'label': 'Kaikki aktiiviset | All active cases', 'value': 'total'},
                     {'label': 'Uudet tartunnat | Confirmed new cases', 'value': 'confirmed'},
+                    {'label': 'Kuolleet yhteensä | All deaths', 'value': 'deaths'},
                 ],
                 value='total',
             ),
@@ -260,6 +261,14 @@ def update_figures(option):
             cumulative=True,
         )
 
+    elif option == 'deaths':
+        size_col = 'deaths'
+
+        data = get_data(
+            '2020-03-20',
+            date_,
+            cumulative=True,
+        )
     else:
         size_col = 'confirmed'
 
