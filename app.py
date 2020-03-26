@@ -58,9 +58,7 @@ def serve_layout():
         html.Div(children=[
             html.H2(children='Suomen koronavirustartunnat',
                     style={'text-align': 'center'}),
-            html.H4(children=f'Aktiiviset tapaukset sairaanhoitopiireittäin {START_DATE} alkaen',
-                    style={'text-align': 'center'}),
-            html.H4(children=f'Active cases in Finland by healthcare district since {START_DATE}',
+            html.H4(children=f'Active cases in Finland by health care district',
                     style={
                         'text-align': 'center',
                         'font-style': 'italic',
@@ -82,6 +80,13 @@ def serve_layout():
         dcc.Graph(id='map'),
 
         dcc.Graph(id='bar-plot'),
+
+        html.Div(children=[
+            html.H4(id='line-plot-title',
+                    style={'text-align': 'center'}),
+        ]),
+
+        dcc.Graph(id='line-plot'),
 
         html.Div(children=[
             html.P(children='Antti Härkönen 2020'),
@@ -223,19 +228,25 @@ def get_data(
     total = pd.concat([confirmed, deaths, recovered], axis=1)
     total = total.fillna(0)
     total['active'] = total['confirmed'] - total['recovered'] - total['deaths']
+    all_country = total.groupby(['pvm']).sum()
 
     total.reset_index(inplace=True)
+    all_country.reset_index(inplace=True)
 
     total['pvm'] = total['pvm'].apply(lambda d: str(d).split()[0])
+    all_country['pvm'] = all_country['pvm'].apply(lambda d: str(d).split()[0])
+
     total['lat'] = total.shp.apply(lambda p: LOCATION_MAPPER.get(p, (65, 23))[0])
     total['lon'] = total.shp.apply(lambda p: LOCATION_MAPPER.get(p, (65, 23))[1])
 
-    return total
+    return total, all_country
 
 
 @app.callback(
     [Output('map', 'figure'),
      Output('bar-plot', 'figure'),
+     Output('line-plot', 'figure'),
+     Output('line-plot-title', 'children'),
      Output('source-fi', 'children'),
      Output('source-en', 'children'),
      ],
@@ -255,7 +266,7 @@ def update_figures(option):
     if option == 'total':
         size_col = 'active'
 
-        data = get_data(
+        data, all_data = get_data(
             START_DATE,
             date_,
             cumulative=True,
@@ -264,15 +275,16 @@ def update_figures(option):
     elif option == 'deaths':
         size_col = 'deaths'
 
-        data = get_data(
+        data, all_data = get_data(
             '2020-03-20',
             date_,
             cumulative=True,
         )
+
     else:
         size_col = 'confirmed'
 
-        data = get_data(
+        data, all_data = get_data(
             START_DATE,
             date_,
             cumulative=False,
@@ -289,7 +301,7 @@ def update_figures(option):
         animation_frame='pvm',
         center={'lat': 63.4, 'lon': 26.0},
         zoom=4,
-        size_max=30,
+        size_max=36,
         height=600,
         width=None,
         opacity=OPACITY,
@@ -301,13 +313,27 @@ def update_figures(option):
         x='pvm',
         y=size_col,
         color='shp',
-        hover_name="shp",
+        hover_name='shp',
         height=520,
         width=None,
         opacity=OPACITY,
     )
 
-    return fig1, fig2, update_time_fi, update_time_en
+    fig3 = px.line(
+        all_data,
+        x='pvm',
+        y=size_col,
+        height=520,
+        width=None,
+    )
+
+    if option == 'confirmed':
+        fig3_title = 'Koko maa | All Finland'
+    else:
+        fig3.update_layout(yaxis_type='log')
+        fig3_title = 'Koko maa, logaritminen asteikko | All Finland, logarithmic scale'
+
+    return fig1, fig2, fig3, fig3_title, update_time_fi, update_time_en
 
 
 if __name__ == '__main__':
