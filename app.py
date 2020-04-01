@@ -22,8 +22,9 @@ HEADERS = {
 
 DATA_URL = 'https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData'
 
-FIRST = '2020-01-28'
+FIRST_DATE = '2020-01-28'
 START_DATE = '2020-03-01'
+END_DATE = '2020-03-31'
 
 OPACITY = 0.8
 
@@ -56,9 +57,9 @@ LOCATION_MAPPER = {
 def serve_layout():
     return html.Div(children=[
         html.Div(children=[
-            html.H2(children='Suomen koronavirustartunnat',
+            html.H2(children='Suomen koronavirustartunnat maaliskuussa 2020',
                     style={'text-align': 'center'}),
-            html.H4(children=f'Active cases in Finland by health care district',
+            html.H4(children=f'COVID-19 cases in March 2020 in Finland by health care district',
                     style={
                         'text-align': 'center',
                         'font-style': 'italic',
@@ -164,7 +165,7 @@ def make_data_frame(
 
         if start_date not in d.pvm.values:
             d = d.append(pd.DataFrame.from_dict({
-                'pvm': [FIRST],
+                'pvm': [FIRST_DATE],
                 'shp': [d.shp.values[0]],
                 'n': [0]
             }))
@@ -268,7 +269,7 @@ def update_figures(option):
 
         data, all_data = get_data(
             START_DATE,
-            date_,
+            END_DATE,
             cumulative=True,
         )
 
@@ -277,7 +278,7 @@ def update_figures(option):
 
         data, all_data = get_data(
             '2020-03-20',
-            date_,
+            END_DATE,
             cumulative=True,
         )
 
@@ -286,7 +287,7 @@ def update_figures(option):
 
         data, all_data = get_data(
             START_DATE,
-            date_,
+            END_DATE,
             cumulative=False,
         )
 
