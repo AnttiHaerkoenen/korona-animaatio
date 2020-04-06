@@ -59,7 +59,7 @@ def serve_layout():
         html.Div(children=[
             html.H2(children='Suomen koronavirustartunnat maaliskuussa 2020',
                     style={'text-align': 'center'}),
-            html.H4(children=f'COVID-19 cases in March 2020 in Finland by health care district',
+            html.H4(children=f'COVID-19 cases in Finland in March 2020 (health care districts)',
                     style={
                         'text-align': 'center',
                         'font-style': 'italic',
